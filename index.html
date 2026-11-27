@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f4f3eb">
+<title>Тихий дом — планер уборки</title>
+<style>
+:root{color-scheme:light;--ink:#242d24;--green:#314732;--muted:#5e685b;--paper:#f4f3eb;--line:#dcdfd3}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,sans-serif}main{max-width:880px;margin:auto;padding:28px 20px 60px}header,.between{display:flex;justify-content:space-between;align-items:center;gap:14px}header{margin-bottom:24px}header strong{font-family:Georgia,serif;font-size:1.45rem}small,.muted{color:var(--muted);font-size:.875rem}h1,h2,blockquote,p{margin:0}h1,h2,blockquote{font-family:Georgia,serif;font-weight:normal}h1{font-size:clamp(2.3rem,7vw,4.5rem);line-height:1.05;margin:10px 0}.hero{position:relative;overflow:hidden;background:var(--green);color:#fcfbf1;padding:clamp(24px,6vw,48px);border-radius:26px}.hero p{color:#e0e7d7}.hero::after{content:"";position:absolute;width:230px;height:230px;border:1px solid #84977a;border-radius:48% 52% 65% 35%;right:-95px;top:-85px;box-shadow:0 0 0 23px #ffffff0b,0 0 0 48px #ffffff08;pointer-events:none}.progress{margin:18px 0;background:#fffef8;padding:18px 22px;border:1px solid var(--line);border-radius:18px}progress{display:block;width:100%;height:12px;margin-top:10px;accent-color:#506d45}nav{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 14px}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--line);background:#fffef8;color:var(--ink);border-radius:12px;padding:9px 14px}button:hover{border-color:#697d60}button[aria-pressed=true],.primary{background:var(--green);border-color:var(--green);color:white}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #8e7253;outline-offset:3px}h2{font-size:1.8rem}.list{list-style:none;margin:12px 0 0;padding:0}.task{display:flex;align-items:center;gap:12px;padding:11px 12px;background:#fffef8;border:1px solid var(--line);border-radius:14px;margin-bottom:8px}.task label{display:flex;align-items:center;gap:12px;flex:1;cursor:pointer;min-width:0;overflow-wrap:anywhere}.task input{width:21px;height:21px;flex:none;accent-color:var(--green)}.task input:checked+span{color:var(--muted);text-decoration:line-through}.edit{font-size:.875rem;padding:7px 10px}.quote{margin-top:27px;padding:23px;background:#e7ebdb;border-radius:20px}.quote blockquote{font-size:clamp(1.3rem,4vw,1.85rem);margin:8px 0 14px}.quote button{background:transparent;border-color:#aab69e}dialog{width:min(92vw,440px);border:1px solid var(--line);border-radius:20px;padding:24px;color:var(--ink);background:#fffef8}dialog::backdrop{background:#17251ac0}form label{display:grid;gap:6px;margin:15px 0}form input,form select{border:1px solid #aab4a4;border-radius:9px;padding:9px;width:100%;background:white;color:var(--ink)}.danger{color:#8b322d}.notice{margin-top:10px;color:#8b322d}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+</style>
+<main>
+<header><strong>Тихий дом</strong><small id="date"></small></header>
+<section class="hero"><p>Личный планер уборки</p><h1>Дома хорошо.</h1><p>Чуть больше порядка, чуть больше воздуха.</p></section>
+<section class="progress" aria-label="Прогресс"><div class="between"><strong id="progressLabel"></strong><span id="count" aria-live="polite"></span></div><progress id="bar" max="1" value="0" aria-label="Выполненные задачи"></progress></section>
+<nav id="filters" aria-label="Периодичность"></nav>
+<section aria-labelledby="heading"><div class="between"><h2 id="heading">Задачи</h2><button id="add" type="button" class="primary">＋ Добавить</button></div><p id="period" class="muted"></p><p id="notice" class="notice" role="status" hidden>Браузер не смог сохранить изменения. Они доступны до закрытия страницы.</p><ul class="list" id="tasks"></ul></section>
+<aside class="quote"><small>Для вдохновения</small><blockquote id="quote" aria-live="polite"></blockquote><button id="next" type="button">Другая фраза</button></aside>
+</main>
+<dialog id="editor"><form id="form"><h2 id="formTitle"></h2><label>Название задачи<input id="name" maxlength="100" required placeholder="Например, сменить постельное бельё"></label><label>Как часто<select id="frequency"></select></label><div class="actions"><button type="submit" class="primary">Сохранить</button><button type="button" id="cancel">Отмена</button><button type="button" id="remove" class="danger">Удалить</button></div></form></dialog>
+<script>
+const periods = {
+ day: ['Каждый день', 'Сегодня', 'Отметки обновляются каждый день.'],
+ week: ['Раз в неделю', 'На этой неделе', 'Новая неделя начинается в понедельник.'],
+ month: ['Раз в месяц', 'В этом месяце', 'Новый период начинается первого числа месяца.'],
+ quarter: ['Раз в квартал', 'В этом квартале', 'Новый период начинается в январе, апреле, июле и октябре.'],
+ year: ['Раз в год', 'В этом году', 'Новый период начинается 1 января.'],
+ once: ['Разово', 'Разовые задачи', 'Отметки сохраняются, пока ты сама их не снимешь.']
+};
+const starter = [
+ ['Протереть стол и столешницу','day'],['Разложить вещи по местам','day'],['Помыть посуду','day'],
+ ['Сменить постельное бельё','week'],['Пропылесосить и вымыть пол','week'],['Убрать ванную','week'],
+ ['Вымыть полки холодильника','month'],['Протереть плинтусы','month'],
+ ['Разобрать одежду по сезону','quarter'],['Постирать шторы','year']
+];
+const quotes = [
+ '«Сегодня достаточно одного уголка, в котором тебе станет уютнее».',
+ '«Пять минут заботы о доме тоже считаются».',
+ '«Порядок начинается с одной вещи, которую ты вернула на место».',
+ '«Пусть после уборки у тебя останутся силы насладиться тишиной».',
+ '«Представь, как приятно будет сесть с чаем рядом с чистым столом».'
+];
+const $ = id => document.getElementById(id);
+const storageKey = 'tihiy-dom-v1';
+const zone = 'Europe/Moscow';
+const dateParts = new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'});
+const dateLabel = new Intl.DateTimeFormat('ru',{timeZone:zone,weekday:'long',day:'numeric',month:'long'});
+let tasks = starter.map(([title, frequency],index) => ({id:String(index),title,frequency,done:''}));
+try { const saved = localStorage.getItem(storageKey); if (saved) tasks = JSON.parse(saved); }
+catch { $('notice').hidden = false; }
+let active = 'day';
+let editing = null;
+let quoteIndex = 0;
+function periodKeys(now) {
+ const parts = Object.fromEntries(dateParts.formatToParts(now).map(part => [part.type,part.value]));
+ const {year,month,day} = parts;
+ const monday = new Date(Date.UTC(Number(year), Number(month)-1, Number(day)));
+ monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay()+6)%7);
+ return {day:year+'-'+month+'-'+day,week:monday.toISOString().slice(0,10),
+ month:year+'-'+month,quarter:year+'-'+Math.ceil(Number(month)/3),year,once:'once'};
+}
+function save() {
+ try { localStorage.setItem(storageKey,JSON.stringify(tasks)); }
+ catch { $('notice').hidden = false; }
+ render();
+}
+function render() {
+ const now = new Date();
+ const key = periodKeys(now)[active];
+ const visible = tasks.filter(task => task.frequency === active);
+ const done = visible.filter(task => task.done === key).length;
+ $('date').textContent = dateLabel.format(now);
+ $('progressLabel').textContent = periods[active][1];
+ $('count').textContent = done+' из '+visible.length;
+ $('bar').max = visible.length || 1;
+ $('bar').value = done;
+ $('period').textContent = periods[active][2];
+ for (const button of $('filters').children) button.setAttribute('aria-pressed',button.dataset.period === active);
+ const rows = visible.map(task => {
+  const row = document.createElement('li');
+  row.className = 'task';
+  const label = document.createElement('label');
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.checked = task.done === key;
+  check.addEventListener('change', () => {
+   task.done = check.checked ? periodKeys(new Date())[task.frequency] : '';
+   save();
+   document.getElementById('check-'+task.id)?.focus();
+  });
+  check.id = 'check-'+task.id;
+  const title = document.createElement('span');
+  title.textContent = task.title;
+  label.append(check,title);
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'edit';
+  edit.textContent = 'Изменить';
+  edit.setAttribute('aria-label','Изменить задачу «'+task.title+'»');
+  edit.onclick = () => openEditor(task);
+  row.append(label,edit);
+  return row;
+ });
+ if (!rows.length) {
+  const empty = document.createElement('li');
+  empty.className = 'task muted';
+  empty.textContent = 'Здесь пока пусто. Добавь своё дело.';
+  rows.push(empty);
+ }
+ $('tasks').replaceChildren(...rows);
+}
+function openEditor(task = null) {
+ editing = task;
+ $('formTitle').textContent = task ? 'Изменить задачу' : 'Добавить задачу';
+ $('name').value = task?.title ?? '';
+ $('frequency').value = task?.frequency ?? active;
+ $('remove').hidden = !task;
+ $('editor').showModal();
+ $('name').focus();
+}
+for (const [value,[label]] of Object.entries(periods)) {
+ $('frequency').add(new Option(label,value));
+ const button = document.createElement('button');
+ button.type = 'button';
+ button.dataset.period = value;
+ button.textContent = label;
+ button.onclick = () => { active = value; render(); };
+ $('filters').append(button);
+}
+$('add').onclick = () => openEditor();
+$('cancel').onclick = () => $('editor').close();
+$('remove').onclick = () => {
+ if (!editing || !confirm('Удалить задачу «'+editing.title+'»?')) return;
+ tasks = tasks.filter(task => task !== editing);
+ $('editor').close();
+ save();
+ $('add').focus();
+};
+$('form').onsubmit = event => {
+ event.preventDefault();
+ const title = $('name').value.trim();
+ if (!title) { $('name').setCustomValidity('Введи название задачи'); $('name').reportValidity(); return; }
+ const frequency = $('frequency').value;
+ if (editing) {
+  if (editing.frequency !== frequency) editing.done = '';
+  Object.assign(editing,{title,frequency});
+ } else tasks.push({id:crypto.randomUUID(),title,frequency,done:''});
+ active = frequency;
+ $('editor').close();
+ save();
+ $('add').focus();
+};
+$('name').oninput = () => $('name').setCustomValidity('');
+$('editor').addEventListener('close',() => $('name').setCustomValidity(''));
+$('next').onclick = () => {
+ quoteIndex = (quoteIndex+1)%quotes.length;
+ $('quote').textContent = quotes[quoteIndex];
+};
+quoteIndex = (Number(periodKeys(new Date()).day.slice(-2))-1)%quotes.length;
+$('quote').textContent = quotes[quoteIndex];
+let currentDay = periodKeys(new Date()).day;
+function refreshDate() {
+ const newDay = periodKeys(new Date()).day;
+ if (newDay !== currentDay) { currentDay = newDay; render(); }
+}
+setInterval(refreshDate,30000);
+document.addEventListener('visibilitychange',refreshDate);
+render();
+</script>
+</html>
